@@ -58,6 +58,7 @@ async function performAction(action) {
     Here is the action you requested: ${action}\n
 
     Please update the code accordingly. Return a json object with two keys. the first key is "oldContent" and the second key is "newContent". Only return the lines of the code that you changed plus the context around it. For example, the current block.
+    If you are adding brand new code, set oldContent to null.
     Return nothing else.
   `;
 
@@ -69,33 +70,40 @@ async function performAction(action) {
 }
 
 function editFile(fileName, oldContent, newContent) {
+  console.log(oldContent, newContent);
   const openEditors = vscode.window.visibleTextEditors;
   const editor = openEditors.find((editor) =>
     editor.document.fileName.includes(fileName)
   );
   editor.edit((editBuilder) => {
     const document = editor.document;
+    if (oldContent) {
+      const escapedFind = oldContent.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"); // Escape special characters in the find text
+      const looseWhitespaceFind = escapedFind.replace(/\s+/g, "\\s*"); // Allow loose whitespace
 
-    const escapedFind = oldContent.replace(/[-/\\^$*+?.()|[\]{}]/g, "\\$&"); // Escape special characters in the find text
-    const looseWhitespaceFind = escapedFind.replace(/\s+/g, "\\s*"); // Allow loose whitespace
+      const regex = new RegExp(looseWhitespaceFind, "g");
+      const matches = document.getText().match(regex);
 
-    const regex = new RegExp(looseWhitespaceFind, "g");
-    const matches = document.getText().match(regex);
+      if (!matches || !matches.length) {
+        vscode.window.showInformationMessage("No matches found.");
+        return;
+      }
 
-    if (!matches || !matches.length) {
-      vscode.window.showInformationMessage("No matches found.");
-      return;
+      const match = matches[0];
+      const startIndex = document.getText().indexOf(match);
+
+      const range = new vscode.Range(
+        document.positionAt(startIndex),
+        document.positionAt(startIndex + match.length)
+      );
+
+      editBuilder.replace(range, newContent);
+    } else {
+      // add to bottom of file
+      const lastLine = document.lineAt(document.lineCount - 1);
+      const end = lastLine.range.end;
+      editBuilder.insert(end, newContent);
     }
-
-    const match = matches[0];
-    const startIndex = document.getText().indexOf(match);
-
-    const range = new vscode.Range(
-      document.positionAt(startIndex),
-      document.positionAt(startIndex + match.length)
-    );
-
-    editBuilder.replace(range, newContent);
   });
 }
 
