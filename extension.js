@@ -98,101 +98,10 @@ function activate(context) {
             console.error('Error during transcription:', error);
             vscode.window.showErrorMessage('Error during transcription:', error.message);
         }
-
-		// const audioFilePath = path.join(context.extensionPath, 'audio.wav');
-        // vscode.window.showInformationMessage('Recording audio for 5 seconds...');
-        // await recordAudio(audioFilePath);
-
-		// start recording
-		// const panel = vscode.window.createWebviewPanel(
-        //     'recordAudio',
-        //     'Record Audio',
-        //     vscode.ViewColumn.One,
-        //     {
-        //         enableScripts: true
-        //     }
-        // );
-
-		// panel.webview.html = getWebviewContent();
-
-        // panel.webview.onDidReceiveMessage(
-        //     message => {
-        //         switch (message.command) {
-        //             case 'audioData':
-        //                 processAudioData(message.data);
-        //                 return;
-        //         }
-        //     },
-        //     undefined,
-        //     context.subscriptions
-        // );
-
-		// context.subscriptions.push(disposable);
-
-		// // Display a message box to the user
-		// vscode.window.showInformationMessage('Hello World from voice2code!');
 	});
 
 	context.subscriptions.push(disposable);
 }
-
-function getWebviewContent() {
-    return `<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Record Audio</title>
-</head>
-<body>
-    <h1>Record Audio</h1>
-    <button id="recordButton">Record</button>
-    <button id="stopButton" disabled>Stop</button>
-    <script>
-        const vscode = acquireVsCodeApi();
-
-        let mediaRecorder;
-        let audioChunks = [];
-
-        document.getElementById('recordButton').onclick = () => {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    mediaRecorder = new MediaRecorder(stream);
-                    mediaRecorder.start();
-
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunks.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = () => {
-                        const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
-                        audioChunks = [];
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                            const base64String = reader.result.replace('data:audio/wav;base64,', '');
-                            vscode.postMessage({
-                                command: 'audioData',
-                                data: base64String
-                            });
-                        };
-                        reader.readAsDataURL(audioBlob);
-                    };
-
-                    document.getElementById('recordButton').disabled = true;
-                    document.getElementById('stopButton').disabled = false;
-                });
-        };
-
-        document.getElementById('stopButton').onclick = () => {
-            mediaRecorder.stop();
-            document.getElementById('recordButton').disabled = false;
-            document.getElementById('stopButton').disabled = true;
-        };
-    </script>
-</body>
-</html>`;
-}
-
 
 function getFileContent() {
 	const editor = vscode.window.activeTextEditor;
