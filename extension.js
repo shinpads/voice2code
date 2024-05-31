@@ -25,10 +25,14 @@ function activate(context) {
         console.log(recordingResult);
         console.log("Starting transcription process...");
         const dir = __dirname + `/${audioFileName}`; // Adjust if necessary
+        const activeEditor = vscode.window.activeTextEditor;
+        const selection = activeEditor.selection;
+        const selectionText = activeEditor.document.getText(selection);
+
         const transcribed = await transcribeAudio(dir);
         console.log("time since start", new Date() - startTime);
         console.log("Transcription:", transcribed);
-        await performAction(transcribed);
+        await performAction(transcribed, selectionText);
         console.log("time since start", new Date() - startTime);
       } catch (error) {
         console.error("Error during transcription:", error);
@@ -43,7 +47,7 @@ function activate(context) {
   context.subscriptions.push(disposable);
 }
 
-async function performAction(action) {
+async function performAction(action, selectionText) {
   // const editor = vscode.window.activeTextEditor;
   const openEditors = vscode.window.visibleTextEditors;
   const editor = openEditors.find((editor) =>
@@ -56,7 +60,11 @@ async function performAction(action) {
     ${text}
 
     Here is the action you requested: ${action}\n
-
+    ${
+      selectionText.length > 1
+        ? "Here is the selected text I am referring to: " + selectionText
+        : ""
+    }
     Please update the code accordingly. Return a json object with two keys. the first key is "oldContent" and the second key is "newContent". Only return the lines of the code that you changed plus the context around it. For example, the current block.
     If you are adding brand new code, set oldContent to null.
     Return nothing else.
