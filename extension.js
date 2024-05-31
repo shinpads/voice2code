@@ -9,7 +9,6 @@ const vscode = require('vscode');
  * @param {vscode.ExtensionContext} context
  */
 function activate(context) {
-
 	// Use the console to output diagnostic information (console.log) and errors (console.error)
 	// This line of code will only be executed once when your extension is activated
 	console.log('Congratulations, your extension "voice2code" is now active!');
@@ -20,12 +19,28 @@ function activate(context) {
 	let disposable = vscode.commands.registerCommand('voice2code.helloWorld', function () {
 		// The code you place here will be executed every time your command is executed
 
+		// get file content
+		getFileContent()
+
 		// Display a message box to the user
 		vscode.window.showInformationMessage('Hello World from voice2code!');
 	});
 
 	context.subscriptions.push(disposable);
 }
+
+function getFileContent() {
+	const editor = vscode.window.activeTextEditor;
+	
+	if (!editor) {
+	  vscode.window.showInformationMessage('No active text editor found.');
+	  return;
+	}
+	
+	const documentText = editor.document.getText();
+	vscode.window.showInformationMessage('Code in the current file:', documentText);
+	console.log('Code in the current file:', documentText);
+  }
 
 // This method is called when your extension is deactivated
 function deactivate() {}
