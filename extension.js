@@ -37,7 +37,6 @@ function activate(context) {
     "voice2code.helloWorld",
     async () => {
       // get file content
-      await performAction("increase the h1 font size");
       getFileContent();
 
       const audioFilePath = path.join(context.extensionPath, "audio.wav");
@@ -50,6 +49,8 @@ function activate(context) {
         console.log("Starting transcription process...");
         const dir = __dirname + "/audio.wav";
         const transcribed = await transcribeAudio(dir);
+        await performAction(transcribed);
+
         console.log("transcribed:", transcribed.text);
       } catch (error) {
         console.error("Error during transcription:", error);
@@ -79,8 +80,9 @@ async function performAction(action) {
 
   const response = await createChatCompletion(prompt, true);
   const parsedJson = JSON.parse(response);
-  console.log(parsedJson);
-  return parsedJson;
+
+  const { oldContent, newContent } = parsedJson;
+  editFile(editor.document.fileName, oldContent, newContent);
 }
 
 function editFile(fileName, oldContent, newContent) {
