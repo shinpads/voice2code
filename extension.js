@@ -65,6 +65,7 @@ async function performAction(action, selectionText) {
     }
     Please return a JSON list of changes to be made to the code. The changes should be in the format of:
     {
+	  one_sentence_summary,
       changes: [
       {
         filename,
@@ -75,15 +76,34 @@ async function performAction(action, selectionText) {
     ]}
 
     oldContent should be the code you are replacing. If you are adding new code, set oldContent to null. Old code should only include the lines you are chaning plus the context around it. For example the current block.
+	one_sentence_summary should be 5 words long, then make a quick joke
   `;
 
   const response = await createChatCompletion(prompt, true);
   const parsedJson = JSON.parse(response);
 
+
   parsedJson.changes.forEach((change) => {
     const { oldContent, newContent, filename } = change;
     editFile(filename, oldContent, newContent);
   });
+
+  summarizeChanges(parsedJson.one_sentence_summary);
+}
+
+const { exec } = require('child_process');
+function summarizeChanges(one_sentence_summary) {
+    exec(`say "${one_sentence_summary}"`, (error, stdout, stderr) => {
+        if (error) {
+            console.error(`exec error: ${error}`);
+            return;
+        }
+        if (stderr) {
+            console.error(`stderr: ${stderr}`);
+            return;
+        }
+        console.log(`stdout: ${stdout}`);
+    });
 }
 
 function editFile(fileName, oldContent, newContent) {
