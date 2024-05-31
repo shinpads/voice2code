@@ -14,7 +14,7 @@ function activate(context) {
   console.log('Congratulations, your extension "voice2code" is now active!');
 
   let disposable = vscode.commands.registerCommand(
-    "voice2code.helloWorld",
+    "voice2code.voice2code",
     async () => {
       try {
         const timestamp = Date.now();

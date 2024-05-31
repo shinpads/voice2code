@@ -14,8 +14,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "voice2code.helloWorld",
-        "title": "Hello World"
+        "command": "voice2code.voice2code",
+        "title": "voice2code"
       }
     ]
   },
