@@ -44,7 +44,12 @@ function activate(context) {
 }
 
 async function performAction(action) {
-  const editor = vscode.window.activeTextEditor;
+  // const editor = vscode.window.activeTextEditor;
+  const openEditors = vscode.window.visibleTextEditors;
+  const editor = openEditors.find((editor) =>
+    editor.document.fileName.includes("index.css")
+  );
+
   const text = editor.document.getText();
   const prompt = `
     Here is some code:\n
