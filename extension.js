@@ -94,22 +94,6 @@ function editFile(fileName, oldContent, newContent) {
   });
 }
 
-function getFileContent() {
-  const editor = vscode.window.activeTextEditor;
-
-  if (!!!editor) {
-    vscode.window.showInformationMessage("No active text editor found.");
-    return;
-  }
-
-  const documentText = editor.document.getText();
-  vscode.window.showInformationMessage(
-    "Code in the current file:",
-    documentText
-  );
-  console.log("Code in the current file:", documentText);
-}
-
 // Function to determine if a buffer chunk is silent
 function isSilent(buffer, threshold = 0.0117285156) {
   let sum = 0;
