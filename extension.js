@@ -2,7 +2,12 @@ const vscode = require("vscode");
 const recorder = require("node-record-lpcm16");
 const fs = require("fs");
 const path = require("path");
-const { transcribeAudio, createChatCompletion } = require("./openai.js");
+const {
+  transcribeAudio,
+  createChatCompletion,
+  createAudioStreamFromText,
+  streamAudio,
+} = require("./openai.js");
 
 /**
  * @param {vscode.ExtensionContext} context
@@ -14,23 +19,37 @@ function activate(context) {
     "voice2code.voice2code",
     async () => {
       try {
-        const timestamp = Date.now();
-        const audioFileName = `audio-${timestamp}.wav`;
-        const audioFilePath = path.join(context.extensionPath, audioFileName);
-        const activeEditor = vscode.window.activeTextEditor;
-        const selection = activeEditor.selection;
-        const selectionText = activeEditor.document.getText(selection);
-        const recordingResult = await recordAudio(audioFilePath);
-        const startTime = new Date();
-        console.log(recordingResult);
-        console.log("Starting transcription process...");
-        const dir = __dirname + `/${audioFileName}`; // Adjust if necessary
+        const progressNotification = vscode.window.withProgress(
+          {
+            location: vscode.ProgressLocation.Notification,
+            title: "Listening...",
+            cancellable: true,
+          },
+          async (progress, token) => {
+            const timestamp = Date.now();
+            const audioFileName = `audio-${timestamp}.wav`;
+            const audioFilePath = path.join(
+              context.extensionPath,
+              audioFileName
+            );
+            const activeEditor = vscode.window.activeTextEditor;
+            const selection = activeEditor.selection;
+            const selectionText = activeEditor.document.getText(selection);
+            const recordingResult = await recordAudio(audioFilePath);
+            const startTime = new Date();
+            console.log(recordingResult);
+            console.log("Starting transcription process...");
+            const dir = __dirname + `/${audioFileName}`; // Adjust if necessary
 
-        const transcribed = await transcribeAudio(dir);
-        console.log("time since start", new Date() - startTime);
-        console.log("Transcription:", transcribed);
-        await performAction(transcribed, selectionText);
-        console.log("time since start", new Date() - startTime);
+            const transcribed = await transcribeAudio(dir);
+            progress.report({ message: "Performing Action..." });
+            console.log("time since start", new Date() - startTime);
+            console.log("Transcription:", transcribed);
+            await performAction(transcribed, selectionText);
+            console.log("time since start", new Date() - startTime);
+            progressNotification.cancel();
+          }
+        );
       } catch (error) {
         console.error("Error during transcription:", error);
         vscode.window.showErrorMessage(
@@ -65,7 +84,7 @@ async function performAction(action, selectionText) {
     }
     Please return a JSON list of changes to be made to the code. The changes should be in the format of:
     {
-	  one_sentence_summary,
+	    one_sentence_summary,
       changes: [
       {
         filename,
@@ -76,12 +95,11 @@ async function performAction(action, selectionText) {
     ]}
 
     oldContent should be the code you are replacing. If you are adding new code, set oldContent to null. Old code should only include the lines you are chaning plus the context around it. For example the current block.
-	one_sentence_summary should be 5 words long, then make a quick joke
+	  one_sentence_summary should be a very short description of what you changed. it should be in past tense and first-person. for example, "I added a new style."
   `;
 
   const response = await createChatCompletion(prompt, true);
   const parsedJson = JSON.parse(response);
-
 
   parsedJson.changes.forEach((change) => {
     const { oldContent, newContent, filename } = change;
@@ -91,19 +109,21 @@ async function performAction(action, selectionText) {
   summarizeChanges(parsedJson.one_sentence_summary);
 }
 
-const { exec } = require('child_process');
-function summarizeChanges(one_sentence_summary) {
-    exec(`say "${one_sentence_summary}"`, (error, stdout, stderr) => {
-        if (error) {
-            console.error(`exec error: ${error}`);
-            return;
-        }
-        if (stderr) {
-            console.error(`stderr: ${stderr}`);
-            return;
-        }
-        console.log(`stdout: ${stdout}`);
-    });
+const { exec } = require("child_process");
+async function summarizeChanges(one_sentence_summary) {
+  const audioStream = await createAudioStreamFromText(one_sentence_summary);
+  streamAudio(audioStream);
+  // exec(`say "${one_sentence_summary}"`, (error, stdout, stderr) => {
+  //   if (error) {
+  //     console.error(`exec error: ${error}`);
+  //     return;
+  //   }
+  //   if (stderr) {
+  //     console.error(`stderr: ${stderr}`);
+  //     return;
+  //   }
+  //   console.log(`stdout: ${stdout}`);
+  // });
 }
 
 function editFile(fileName, oldContent, newContent) {

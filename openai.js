@@ -1,5 +1,6 @@
 // const apiKey = process.env.OPENAI_API_KEY;
 require("dotenv").config({ path: __dirname + "/.env" });
+const Speaker = require("speaker");
 
 const fs = require("fs");
 const OpenAI = require("openai");
@@ -36,7 +37,39 @@ async function transcribeAudio(audioFilePath) {
   }
 }
 
+async function createAudioStreamFromText(text) {
+  const response = await openai.audio.speech.create({
+    input: text,
+    speed: 1,
+    voice: "onyx",
+    model: "tts-1",
+    response_format: "wav",
+  });
+  return response.body;
+}
+
+async function streamAudio(audioStream) {
+  // stream audio chunk by chunk
+  const speaker = new Speaker({
+    channels: 1, // 2 channels
+    bitDepth: 16, // 16-bit samples
+    sampleRate: 24000, // 44,100 Hz sample rate
+    format: 8,
+  });
+  // iterate over audio stream in chunk sizes of 1024
+  let skip = 1;
+  for await (const chunk of audioStream) {
+    if (skip > 0) {
+      skip--;
+      continue;
+    }
+    speaker.write(chunk);
+  }
+}
+
 module.exports = {
   createChatCompletion,
   transcribeAudio,
+  createAudioStreamFromText,
+  streamAudio,
 };
