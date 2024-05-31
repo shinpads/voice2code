@@ -7,26 +7,6 @@ const path = require("path");
 const request = require("request");
 const { transcribeAudio, createChatCompletion } = require("./openai.js");
 
-async function recordAudio(filePath) {
-  return new Promise((resolve, reject) => {
-    console.log("Starting audio recording...");
-    const recording = recorder.record({
-      sampleRateHertz: 16000,
-      recordProgram: "sox -d",
-    });
-
-    const fileStream = fs.createWriteStream(filePath, { encoding: "binary" });
-
-    recording.stream().pipe(fileStream);
-
-    setTimeout(() => {
-      console.log("Stopping audio recording...");
-      recording.stop();
-      resolve(filePath);
-    }, 3000); // Record for 3 seconds
-  });
-}
-
 /**
  * @param {vscode.ExtensionContext} context
  */
@@ -36,22 +16,20 @@ function activate(context) {
   let disposable = vscode.commands.registerCommand(
     "voice2code.helloWorld",
     async () => {
-      // get file content
-      getFileContent();
-
-      const audioFilePath = path.join(context.extensionPath, "audio.wav");
-
       try {
-        console.log("Starting audio recording process...");
-        await recordAudio(audioFilePath);
-        console.log(audioFilePath);
-
+        const timestamp = Date.now();
+        const audioFileName = `audio-${timestamp}.wav`;
+        const audioFilePath = path.join(context.extensionPath, audioFileName);
+        const recordingResult = await recordAudio(audioFilePath);
+        const startTime = new Date();
+        console.log(recordingResult);
         console.log("Starting transcription process...");
-        const dir = __dirname + "/audio.wav";
+        const dir = __dirname + `/${audioFileName}`; // Adjust if necessary
         const transcribed = await transcribeAudio(dir);
+        console.log("time since start", new Date() - startTime);
+        console.log("Transcription:", transcribed);
         await performAction(transcribed);
-
-        console.log("transcribed:", transcribed.text);
+        console.log("time since start", new Date() - startTime);
       } catch (error) {
         console.error("Error during transcription:", error);
         vscode.window.showErrorMessage(
@@ -107,7 +85,6 @@ function editFile(fileName, oldContent, newContent) {
     const match = matches[0];
     const startIndex = document.getText().indexOf(match);
 
-    console.log(match, startIndex);
     const range = new vscode.Range(
       document.positionAt(startIndex),
       document.positionAt(startIndex + match.length)
@@ -131,6 +108,66 @@ function getFileContent() {
     documentText
   );
   console.log("Code in the current file:", documentText);
+}
+
+// Function to determine if a buffer chunk is silent
+function isSilent(buffer, threshold = 0.0117285156) {
+  let sum = 0;
+  for (let i = 0; i < buffer.length; i += 2) {
+    sum += Math.abs(buffer.readInt16LE(i));
+  }
+  let average = sum / (buffer.length / 2);
+  console.log(average < threshold * 32768);
+  console.log(`Average amplitude: ${average}, Threshold: ${threshold * 32768}`);
+  return average < threshold * 32768;
+}
+
+// Record audio and process chunks manually
+async function recordAudio(filePath) {
+  return new Promise((resolve, reject) => {
+    const fileStream = fs.createWriteStream(filePath, { encoding: "binary" });
+
+    console.log("Starting audio recording...");
+    const recording = recorder
+      .record({
+        sampleRateHertz: 16000,
+        recordProgram: "sox -d",
+      })
+      .stream();
+
+    // Handle stream data directly through a writable stream
+    recording.pipe(fileStream);
+
+    let continueFlag = true;
+    let silenceStartTime = null; // Reset silence start time
+
+    recording.on("data", (chunk) => {
+      if (!continueFlag) {
+        console.log("700ms second of silence detected, stopping recording...");
+        fileStream.end(); // Ensure to close the file stream
+        // recording.stop();  // Stop the recording
+        resolve();
+      }
+
+      console.log(`chunk size ${chunk.length}`);
+      if (!isSilent(chunk)) {
+        console.log("talking");
+        silenceStartTime = null; // Reset silence start time
+      } else {
+        if (!silenceStartTime) {
+          silenceStartTime = new Date(); // Mark the start of silence
+        } else if (new Date() - silenceStartTime >= 500 && recording) {
+          // Check if silence lasted 1 second
+          console.log("setting flag to false");
+          continueFlag = false;
+        }
+      }
+    });
+    recording.on("end", () => {
+      console.log("Recording ended.");
+      resolve("Recording successfully ended."); // Resolve the promise here
+    });
+  });
 }
 
 // This method is called when your extension is deactivated

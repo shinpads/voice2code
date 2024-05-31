@@ -8,7 +8,6 @@ const openai = new OpenAI({
 });
 
 async function createChatCompletion(prompt, jsonMode = false) {
-  console.log("calling");
   const completion = await openai.chat.completions.create({
     model: "gpt-4o",
     messages: [
