@@ -1,10 +1,7 @@
-// The module 'vscode' contains the VS Code extensibility API
-// Import the module and reference it with the alias vscode in your code below
 const vscode = require("vscode");
 const recorder = require("node-record-lpcm16");
 const fs = require("fs");
 const path = require("path");
-const request = require("request");
 const { transcribeAudio, createChatCompletion } = require("./openai.js");
 
 /**
@@ -20,14 +17,14 @@ function activate(context) {
         const timestamp = Date.now();
         const audioFileName = `audio-${timestamp}.wav`;
         const audioFilePath = path.join(context.extensionPath, audioFileName);
+        const activeEditor = vscode.window.activeTextEditor;
+        const selection = activeEditor.selection;
+        const selectionText = activeEditor.document.getText(selection);
         const recordingResult = await recordAudio(audioFilePath);
         const startTime = new Date();
         console.log(recordingResult);
         console.log("Starting transcription process...");
         const dir = __dirname + `/${audioFileName}`; // Adjust if necessary
-        const activeEditor = vscode.window.activeTextEditor;
-        const selection = activeEditor.selection;
-        const selectionText = activeEditor.document.getText(selection);
 
         const transcribed = await transcribeAudio(dir);
         console.log("time since start", new Date() - startTime);
@@ -48,16 +45,17 @@ function activate(context) {
 }
 
 async function performAction(action, selectionText) {
-  // const editor = vscode.window.activeTextEditor;
   const openEditors = vscode.window.visibleTextEditors;
-  const editor = openEditors.find((editor) =>
-    editor.document.fileName.includes("index.css")
-  );
+  const code = openEditors.map((editor) => ({
+    code: editor.document.getText(),
+    fileName: editor.document.fileName,
+  }));
 
-  const text = editor.document.getText();
   const prompt = `
-    Here is some code:\n
-    ${text}
+    Here is my code code:\n
+    ${code
+      .map((c) => `File Name: ${c.fileName}\nCode:\`\`\`${c.code}\`\`\``)
+      .join("\n\n")}
 
     Here is the action you requested: ${action}\n
     ${
@@ -65,20 +63,31 @@ async function performAction(action, selectionText) {
         ? "Here is the selected text I am referring to: " + selectionText
         : ""
     }
-    Please update the code accordingly. Return a json object with two keys. the first key is "oldContent" and the second key is "newContent". Only return the lines of the code that you changed plus the context around it. For example, the current block.
-    If you are adding brand new code, set oldContent to null.
-    Return nothing else.
+    Please return a JSON list of changes to be made to the code. The changes should be in the format of:
+    {
+      changes: [
+      {
+        filename,
+        oldContent,
+        newContent,
+      }
+      ... other changes
+    ]}
+
+    oldContent should be the code you are replacing. If you are adding new code, set oldContent to null. Old code should only include the lines you are chaning plus the context around it. For example the current block.
   `;
 
   const response = await createChatCompletion(prompt, true);
   const parsedJson = JSON.parse(response);
 
-  const { oldContent, newContent } = parsedJson;
-  editFile(editor.document.fileName, oldContent, newContent);
+  parsedJson.changes.forEach((change) => {
+    const { oldContent, newContent, filename } = change;
+    editFile(filename, oldContent, newContent);
+  });
 }
 
 function editFile(fileName, oldContent, newContent) {
-  console.log(oldContent, newContent);
+  console.log(fileName, oldContent, newContent);
   const openEditors = vscode.window.visibleTextEditors;
   const editor = openEditors.find((editor) =>
     editor.document.fileName.includes(fileName)
