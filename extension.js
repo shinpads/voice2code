@@ -37,6 +37,7 @@ function activate(context) {
     "voice2code.helloWorld",
     async () => {
       // get file content
+      await performAction("increase the h1 font size");
       getFileContent();
 
       const audioFilePath = path.join(context.extensionPath, "audio.wav");
@@ -61,6 +62,25 @@ function activate(context) {
   );
 
   context.subscriptions.push(disposable);
+}
+
+async function performAction(action) {
+  const editor = vscode.window.activeTextEditor;
+  const text = editor.document.getText();
+  const prompt = `
+    Here is some code:\n
+    ${text}
+
+    Here is the action you requested: ${action}\n
+
+    Please update the code accordingly. Return a json object with two keys. the first key is "oldContent" and the second key is "newContent". Only return the lines of the code that you changed plus the context around it. For example, the current block.
+    Return nothing else.
+  `;
+
+  const response = await createChatCompletion(prompt, true);
+  const parsedJson = JSON.parse(response);
+  console.log(parsedJson);
+  return parsedJson;
 }
 
 function editFile(fileName, oldContent, newContent) {
